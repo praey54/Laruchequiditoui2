@@ -1,0 +1,50 @@
+{
+  "name": "la-ruche-qui-dit-oui",
+  "version": "1.0.0",
+  "description": "Marketplace de produits locaux - Multi-plateforme (Web + Mobile)",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:web\" \"npm run dev:api\"",
+    "dev:web": "cd apps/web && npm run dev",
+    "dev:mobile": "cd apps/mobile && npm start",
+    "dev:api": "cd apps/backend && npm run dev",
+    "build": "npm run build:shared && npm run build:web && npm run build:api",
+    "build:shared": "cd packages/shared && npm run build",
+    "build:web": "cd apps/web && npm run build",
+    "build:api": "cd apps/backend && npm run build",
+    "build:mobile": "cd apps/mobile && expo build",
+    "install:all": "npm install && npm run install:apps && npm run install:packages",
+    "install:apps": "cd apps/web && npm install && cd ../mobile && npm install && cd ../backend && npm install",
+    "install:packages": "cd packages/shared && npm install && cd ../ui-components && npm install",
+    "lint": "npm run lint:web && npm run lint:mobile && npm run lint:api",
+    "lint:web": "cd apps/web && npm run lint",
+    "lint:mobile": "cd apps/mobile && npm run lint",
+    "lint:api": "cd apps/backend && npm run lint",
+    "test": "npm run test:shared && npm run test:web && npm run test:api",
+    "test:shared": "cd packages/shared && npm test",
+    "test:web": "cd apps/web && npm test",
+    "test:api": "cd apps/backend && npm test",
+    "db:migrate": "cd apps/backend && npx prisma migrate dev",
+    "db:generate": "cd apps/backend && npx prisma generate",
+    "db:seed": "cd apps/backend && npx prisma db seed"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.0.0",
+    "lerna": "^8.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0"
+  },
+  "author": "LaRucheQuiDitOui Team",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^17.2.1",
+    "pg": "^8.16.3"
+  }
+}

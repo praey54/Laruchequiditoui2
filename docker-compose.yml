@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: larucheqs_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: larucheqs_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - larucheqs_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d larucheqs_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache (optionnel pour le développement)
+  redis:
+    image: redis:7-alpine
+    container_name: larucheqs_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - larucheqs_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Adminer - Interface d'administration de base de données
+  adminer:
+    image: adminer:4-standalone
+    container_name: larucheqs_adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    networks:
+      - larucheqs_network
+    depends_on:
+      - postgres
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: nette
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  larucheqs_network:
+    driver: bridge

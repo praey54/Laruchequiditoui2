@@ -1,0 +1,484 @@
+// Schéma de base de données pour La Ruche Qui Dit Oui
+// Modèle inspiré de Vinted pour marketplace de produits locaux
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Modèle utilisateur
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  name      String   // Combined name field
+  firstName String
+  lastName  String
+  avatar    String?
+  phone     String?
+  role      UserRole @default(USER)
+  isVerified Boolean @default(false)
+  rating    Float?   @default(4.5)
+  reviewCount Int    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  profile       UserProfile?
+  location      Location?    @relation(fields: [locationId], references: [id])
+  locationId    String?
+  shop          Shop?
+  products      Product[]
+  ordersAsBuyer Order[]      @relation("BuyerOrders")
+  ordersAsSeller Order[]     @relation("SellerOrders")
+  sentMessages  Message[]    @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+  reviews       Review[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id          String                     @id @default(cuid())
+  userId      String                     @unique
+  user        User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio         String?
+  website     String?
+  instagram   String?
+  facebook    String?
+  preferences UserPreferences?
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+
+  @@map("user_profiles")
+}
+
+model UserPreferences {
+  id            String                    @id @default(cuid())
+  profileId     String                    @unique
+  profile       UserProfile               @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  notifications NotificationPreferences?
+  privacy       PrivacySettings?
+  language      String                    @default("fr")
+  currency      String                    @default("EUR")
+  
+  @@map("user_preferences")
+}
+
+model NotificationPreferences {
+  id           String          @id @default(cuid())
+  preferencesId String         @unique
+  preferences  UserPreferences @relation(fields: [preferencesId], references: [id], onDelete: Cascade)
+  email        Boolean         @default(true)
+  push         Boolean         @default(true)
+  sms          Boolean         @default(false)
+  marketing    Boolean         @default(false)
+  
+  @@map("notification_preferences")
+}
+
+model PrivacySettings {
+  id               String          @id @default(cuid())
+  preferencesId    String          @unique
+  preferences      UserPreferences @relation(fields: [preferencesId], references: [id], onDelete: Cascade)
+  showLocation     Boolean         @default(true)
+  showPhone        Boolean         @default(false)
+  profileVisibility ProfileVisibility @default(PUBLIC)
+  
+  @@map("privacy_settings")
+}
+
+// Modèle boutique
+model Shop {
+  id          String           @id @default(cuid())
+  name        String
+  description String
+  slug        String           @unique
+  logo        String?
+  banner      String?
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relations
+  owner       User             @relation(fields: [ownerId], references: [id])
+  ownerId     String           @unique
+  location    Location?        @relation(fields: [locationId], references: [id])
+  locationId  String?
+  theme       ShopTheme?
+  customization ShopCustomization?
+  products    Product[]
+  orders      Order[]
+
+  @@map("shops")
+}
+
+model ShopTheme {
+  id       String        @id @default(cuid())
+  shopId   String        @unique
+  shop     Shop          @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name     String
+  category ThemeCategory
+  colors   Json          // Stockage des couleurs en JSON
+  fonts    Json          // Stockage des polices en JSON
+  layout   Json          // Configuration du layout en JSON
+  isCustom Boolean       @default(false)
+
+  @@map("shop_themes")
+}
+
+model ShopCustomization {
+  id             String    @id @default(cuid())
+  shopId         String    @unique
+  shop           Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  welcomeMessage String?
+  story          String?
+  specialties    String[]  
+  openingHours   Json      // Horaires d'ouverture en JSON
+  deliveryInfo   Json      // Infos de livraison en JSON
+  socialMedia    Json      // Réseaux sociaux en JSON
+  customSections Json      // Sections personnalisées en JSON
+
+  @@map("shop_customizations")
+}
+
+// Modèle localisation
+model Location {
+  id          String  @id @default(cuid())
+  address     String
+  city        String
+  postalCode  String
+  region      String
+  country     String  @default("France")
+  latitude    Float
+  longitude   Float
+  timezone    String  @default("Europe/Paris")
+
+  // Relations
+  users     User[]
+  shops     Shop[]
+  products  Product[]
+
+  @@map("locations")
+}
+
+// Modèle catégorie
+model Category {
+  id          String        @id @default(cuid())
+  name        String
+  slug        String        @unique
+  description String
+  icon        String
+  color       String
+  imageUrl    String?
+  order       Int
+  isActive    Boolean       @default(true)
+  parentId    String?
+  parent      Category?     @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[]    @relation("CategoryHierarchy")
+  products    Product[]
+
+  @@map("categories")
+}
+
+// Modèle produit (cœur de la marketplace)
+model Product {
+  id             String            @id @default(cuid())
+  title          String
+  description    String
+  price          Float
+  originalPrice  Float?            // For discounted products
+  currency       String            @default("EUR")
+  status         ProductStatus     @default(ACTIVE)
+  condition      ProductCondition  @default(NEW)
+  quantity       Int               @default(1)
+  unit           ProductUnit       @default(PIECE)
+  tags           String[]
+  views          Int               @default(0)
+  likes          Int               @default(0)
+  image          String            // Main image URL
+  isOrganic      Boolean           @default(false)
+  isFresh        Boolean           @default(false)
+  distance       String?           // Distance from user
+  harvestDate    DateTime?
+  expirationDate DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  // Relations
+  seller         User              @relation(fields: [sellerId], references: [id])
+  sellerId       String
+  shop           Shop?             @relation(fields: [shopId], references: [id])
+  shopId         String?
+  category       Category          @relation(fields: [categoryId], references: [id])
+  categoryId     String
+  location       Location          @relation(fields: [locationId], references: [id])
+  locationId     String
+  images         ProductImage[]
+  specifications ProductSpecification?
+  availability   ProductAvailability?
+  orderItems     OrderItem[]
+  reviews        Review[]
+
+  @@map("products")
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String
+  order     Int
+  isMain    Boolean @default(false)
+
+  @@map("product_images")
+}
+
+model ProductSpecification {
+  id            String   @id @default(cuid())
+  productId     String   @unique
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  weight        Float?
+  dimensions    Json?    // {length, width, height}
+  origin        String?
+  variety       String?
+  season        String[] // Saisons de disponibilité
+  certifications String[] // Certifications (bio, AOC, etc.)
+
+  @@map("product_specifications")
+}
+
+model ProductAvailability {
+  id          String    @id @default(cuid())
+  productId   String    @unique
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  startDate   DateTime?
+  endDate     DateTime?
+  daysOfWeek  Int[]     // 0-6 (Dimanche-Samedi)
+  timeSlots   Json      // Créneaux horaires en JSON
+
+  @@map("product_availability")
+}
+
+// Modèle commande
+model Order {
+  id          String      @id @default(cuid())
+  orderNumber String      @unique
+  status      OrderStatus @default(PENDING)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  buyer       User        @relation("BuyerOrders", fields: [buyerId], references: [id])
+  buyerId     String
+  seller      User        @relation("SellerOrders", fields: [sellerId], references: [id])
+  sellerId    String
+  shop        Shop?       @relation(fields: [shopId], references: [id])
+  shopId      String?
+  items       OrderItem[]
+  payment     OrderPayment?
+  delivery    OrderDelivery?
+  totals      OrderTotals?
+  timeline    OrderTimeline[]
+  messages    Message[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  orderId     String
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+  quantity    Int
+  unitPrice   Float
+  totalPrice  Float
+  specifications String? // Notes spéciales du client
+
+  @@map("order_items")
+}
+
+model OrderPayment {
+  id                    String        @id @default(cuid())
+  orderId               String        @unique
+  order                 Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method                PaymentMethod
+  status                PaymentStatus @default(PENDING)
+  amount                Float
+  currency              String        @default("EUR")
+  stripePaymentIntentId String?
+  paidAt                DateTime?
+  refundedAt            DateTime?
+  platformFee           Float         // Commission plateforme
+  paymentProcessingFee  Float         // Frais Stripe
+  totalFees             Float
+
+  @@map("order_payments")
+}
+
+model OrderDelivery {
+  id              String         @id @default(cuid())
+  orderId         String         @unique
+  order           Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method          DeliveryMethod
+  address         Json?          // Adresse de livraison en JSON
+  pickupLocation  Json?          // Lieu de retrait en JSON
+  estimatedDate   DateTime?
+  actualDate      DateTime?
+  trackingNumber  String?
+  instructions    String?
+  fee             Float          @default(0)
+
+  @@map("order_deliveries")
+}
+
+model OrderTotals {
+  id          String @id @default(cuid())
+  orderId     String @unique
+  order       Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  subtotal    Float
+  deliveryFee Float
+  serviceFee  Float
+  taxes       Float
+  total       Float
+  currency    String @default("EUR")
+
+  @@map("order_totals")
+}
+
+model OrderTimeline {
+  id        String      @id @default(cuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    OrderStatus
+  timestamp DateTime    @default(now())
+  message   String?
+  actor     TimelineActor
+
+  @@map("order_timeline")
+}
+
+// Modèle messages
+model Message {
+  id          String    @id @default(cuid())
+  orderId     String?
+  order       Order?    @relation(fields: [orderId], references: [id])
+  senderId    String
+  sender      User      @relation("SentMessages", fields: [senderId], references: [id])
+  receiverId  String
+  receiver    User      @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  content     String
+  isRead      Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@map("messages")
+}
+
+// Modèle avis
+model Review {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  rating    Int      // 1-5 étoiles
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@unique([productId, userId])
+  @@map("reviews")
+}
+
+// Enums
+enum UserRole {
+  USER
+  SELLER
+  ADMIN
+}
+
+enum ProfileVisibility {
+  PUBLIC
+  PRIVATE
+  SELLERS_ONLY
+}
+
+enum ThemeCategory {
+  NATURE
+  MODERN
+  RUSTIC
+  ELEGANT
+  COLORFUL
+  MINIMALIST
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  SOLD
+  EXPIRED
+  SUSPENDED
+}
+
+enum ProductCondition {
+  NEW
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+}
+
+enum ProductUnit {
+  PIECE
+  KG
+  GRAM
+  LITER
+  BUNCH
+  BASKET
+  BOX
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  IN_DELIVERY
+  DELIVERED
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CARD
+  PAYPAL
+  BANK_TRANSFER
+  CASH
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum DeliveryMethod {
+  PICKUP
+  HOME_DELIVERY
+  PICKUP_POINT
+}
+
+enum TimelineActor {
+  BUYER
+  SELLER
+  SYSTEM
+}
