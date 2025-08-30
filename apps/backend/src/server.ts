@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { db } from './lib/db';
 import productRoutes from './routes/productRoutes';
+import authRoutes from './routes/authRoutes';
 
 // Load environment variables
 dotenv.config();
@@ -62,6 +63,7 @@ app.get('/health', async (req, res) => {
 
 // API routes
 app.use('/api/products', productRoutes);
+app.use('/api/auth', authRoutes);
 
 // API routes placeholder
 app.get('/api', (req, res) => {
@@ -71,7 +73,8 @@ app.get('/api', (req, res) => {
     endpoints: {
       health: '/health',
       api: '/api',
-      products: '/api/products'
+      products: '/api/products',
+      auth: '/api/auth'
     }
   });
 });

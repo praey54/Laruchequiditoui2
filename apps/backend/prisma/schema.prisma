@@ -15,6 +15,7 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   username  String   @unique
+  password  String   // Hashed password for authentication
   name      String   // Combined name field
   firstName String
   lastName  String
@@ -38,8 +39,21 @@ model User {
   sentMessages  Message[]    @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
   reviews       Review[]
+  sessions      Session[]    // Authentication sessions
 
   @@map("users")
+}
+
+// Modèle session pour l'authentification
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("sessions")
 }
 
 model UserProfile {
